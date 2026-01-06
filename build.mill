@@ -1,0 +1,229 @@
+package build
+
+import mill._
+import mill.scalalib._
+import mill.javalib._
+
+import java.io.File
+import scala.sys.process._
+import mill.api.Task.Simple
+
+object hny2026 extends ScalaModule { module =>
+  def scalaVersion = "2.13.18"
+  val chiselVersion = "7.6.0"
+  val scalaTestVersion = "3.2.19"
+  val main = "hny2026.HNY2026"
+
+  def scalacOptions = Seq(
+    "-language:reflectiveCalls",
+    "-language:implicitConversions",
+    "-deprecation"
+  )
+
+  def mvnDeps = Seq(
+    mvn"org.chipsalliance::chisel:$chiselVersion",
+  )
+
+  def scalacPluginMvnDeps = Seq(
+    mvn"org.chipsalliance:::chisel-plugin:$chiselVersion",
+  )
+
+  object test extends ScalaTests with TestModule.ScalaTest {
+    def mvnDeps = module.mvnDeps() ++ Seq(
+      mvn"org.scalatest::scalatest::${module.scalaTestVersion}"
+    )
+  }
+}
+
+/**
+ * Common build flow tasks.
+ */
+trait Flow extends Module {
+  /**
+   * Optional top selection.
+   */
+  def top: Option[String] = None
+
+  /**
+   * Clock frequency in Hz.
+   */
+  def clockFrequency: Int
+
+  /**
+   * Override example:
+   *
+   * ```
+   * override def staticSrc = Some(Task.Sources("src0.v", "src1.v", ...))
+   * ```
+   */
+  def staticSrc: Option[Simple[Seq[PathRef]]] = None
+
+  /**
+   * Build Chisel project.
+   *
+   * @return    list of generated SV sources.
+   */
+  def generate = Task {
+    hny2026.runner().run(Seq(s"clockFreq=$clockFrequency"), hny2026.main)
+
+    File(Task.dest.toURI).listFiles{
+      (_, fileName) => fileName.endsWith((".sv"))
+    }.map(f => PathRef(os.Path(f)))
+  }
+}
+
+/**
+ * Gowin flow with Yosys and Nextpnr.
+ */
+trait GowinFlow extends Flow {
+  def family: String
+  def device: String
+
+  /**
+   * Overriding example:
+   *
+   * ```
+   * override def cstFile = Task.Source("resources/hny2026.cst")
+   * ```
+   */
+  def cstFile: Simple[PathRef]
+
+  /**
+   * Synth with yosys.
+   *
+   * @return    path to json netlist.
+   */
+  def synth = Task {
+    val out = Task.dest
+    val synthJson = out / "synth.json"
+    val genSrc = generate().map(_.path).mkString(" ")
+
+    val stSrc = if (staticSrc.isDefined) {
+      (staticSrc.get)().map(_.path).mkString(" ")
+    } else ""
+
+    val topCmd = top match {
+      case Some(t) => s"-top $t"
+      case _ => ""
+    }
+
+    val yosysSlangPlugin = sys.env("YOSYS_SLANG_SO")
+
+    os.call((
+      "yosys", "-m", yosysSlangPlugin, "-l", s"$out/yosys.log", "-p",
+      s"read_slang $genSrc $stSrc; synth_gowin $topCmd -nowidelut -json $synthJson"
+    ))
+
+    PathRef(synthJson)
+  }
+
+  /**
+   * Place and route with nextpnr.
+   *
+   * @return    path to PnR json.
+   */
+  def pnr = Task {
+    val out = Task.dest
+    val pnrJson = out / "placenroute.json"
+    val synthJson = synth().path
+    val clockMhz = (clockFrequency.toDouble / 1000000).floor.toInt
+
+    os.call((
+      "nextpnr-himbaechel",
+      "--json", synthJson,
+      "--write", pnrJson,
+      "--freq", s"$clockMhz",
+      "--device", device,
+      "--vopt", s"family=$family",
+      "--vopt", s"cst=${cstFile().path}",
+      "-l", s"$out/nextpnr.log"
+    ))
+
+    PathRef(pnrJson)
+  }
+
+  /**
+   * Build bitstream.
+   *
+   * @return    path to bitstream file.
+   */
+  def bitstream = Task {
+    val out = Task.dest
+    val bs = out / "bitstream.fs"
+    val pnrJson = pnr().path
+
+    os.call(("gowin_pack", "-d", device, "-o", bs, pnrJson))
+
+    PathRef(bs)
+  }
+
+  /**
+   * Load bitstream into FPGA SRAM.
+   */
+  def load(args: String*) = Task.Command {
+    val bs = bitstream().path
+    os.call(
+      cmd = ("openFPGALoader", "-c", "ft2232", "-m", bs),
+      stdout = os.Inherit
+    )
+  }
+
+  /**
+   * Birn FPGA flash with bitstream.
+   */
+  def burn(args: String*) = Task.Command {
+    val bs = bitstream().path
+    os.call(
+      cmd = ("openFPGALoader", "-c", "ft2232", "--unprotect-flash", "-f", bs),
+      stdout = os.Inherit
+    )
+  }
+}
+
+/**
+ * TangNano 1K target.
+ *
+ * Build command.
+ *
+ * Generate SystemVerilog files from Chisel source:
+ * ```
+ * $ mill tangNano1k.generate
+ * ```
+ *
+ * Synthesize the source code using Yosys:
+ * ```
+ * $ mill tangNano1k.synth
+ * ```
+ *
+ * Place and route using Nextpnr:
+ * ```
+ * $ mill tangNano1k.pnr
+ * ```
+ *
+ * Build bitstream:
+ * ```
+ * $ mill tangNano1k.bitstream
+ * ```
+ *
+ * Load bitstream into FPGA's SRAM:
+ * ```
+ * $ mill tangNano1k.load
+ * ```
+ *
+ * Burn FPGA flash with a bistream:
+ * ```
+ * $ mill tangNano1k.burn
+ * ```
+ *
+ * Each subsequent command automatically calls the previous one, so when 'burn' is invoked, all
+ * required steps will be performed – SV generation, synthesis, PnR, and bitstream assembly.
+ */
+object tangNano1k extends Module with GowinFlow {
+  def top = Some("hny2026_top")
+  def family = "GW1NZ-1"
+  def device = "GW1NZ-LV1QN48C6/I5"
+  def clockFrequency = 27000000
+
+  def staticSrc = Some(Task.Sources("verilog/hny2026_top.v"))
+  def cstFile = Task.Source("resources/hny2026.cst")
+}
