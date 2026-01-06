@@ -48,7 +48,7 @@ mill hny2026.test
 - [openFPGALoader](https://github.com/trabucayre/openFPGALoader)
 - [TangNano 1K](https://wiki.sipeed.com/hardware/en/tang/Tang-Nano-1K/Nano-1k.html) development board (GW1NZ-LV1QN48C6/I5)
 
-Yosys and other utilities can be taken from the [OSS CAD Suite](https://github.com/YosysHQ/oss-cad-suite-build) package or installed using the package manager [Nix](https://nixos.org/download/):
+Yosys and other utilities can be taken from the [OSS CAD Suite](https://github.com/YosysHQ/oss-cad-suite-build) package or installed using the package manager [Nix](https://nixos.org/download/):
 
 ```bash
 nix-shell shell.nix

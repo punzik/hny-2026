@@ -170,7 +170,7 @@ class HNY2026(cfg: HnyConfig, str: String) extends Module {
  *
  * Available arguments:
  * <ul>
- *   <li><b>clockFreq</b> – clock frequency in Hz (default 27 MHz)</li>
+ *   <li><b>clockFreq</b> - clock frequency in Hz (default 27 MHz)</li>
  * </ul>
  */
 object HNY2026 extends App {
