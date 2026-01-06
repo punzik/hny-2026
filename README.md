@@ -2,7 +2,7 @@
 
 A Chisel-based FPGA design that transmits a New Year's greeting message via LED patterns on a TangNano 1K development board.
 
-![Video](./video/video.mp4)
+[![Video](./video/video.gif)](./video/video.mp4)
 
 ## How It Works
 
