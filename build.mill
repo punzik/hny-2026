@@ -107,11 +107,16 @@ trait GowinFlow extends Flow {
       case _ => ""
     }
 
-    val yosysSlangPlugin = sys.env("YOSYS_SLANG_SO")
+    val yosysSlangPluginSo = sys.env.get("YOSYS_SLANG_SO")
+
+    val (pluginArg, pluginCmd) = yosysSlangPluginSo match {
+      case Some(soName) => (Seq("-m", soName), "")
+      case _ => (Seq(), "plugin -i slang;")
+    }
 
     os.call((
-      "yosys", "-m", yosysSlangPlugin, "-l", s"$out/yosys.log", "-p",
-      s"read_slang $genSrc $stSrc; synth_gowin $topCmd -nowidelut -json $synthJson"
+      "yosys", pluginArg, "-l", s"$out/yosys.log", "-p",
+      s"$pluginCmd read_slang $genSrc $stSrc; synth_gowin $topCmd -nowidelut -json $synthJson"
     ))
 
     PathRef(synthJson)
