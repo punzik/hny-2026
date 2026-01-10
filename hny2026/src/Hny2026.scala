@@ -148,7 +148,7 @@ class HNY2026(cfg: HnyConfig, str: String) extends Module {
   sender.io.data.valid := !sent
   sender.io.data.bits := chars(charCnt)
 
-  when(sender.io.data.ready) {
+  when(sender.io.data.fire) {
     when(charCnt === (chars.length - 1).U) {
       charCnt := 0.U
 
