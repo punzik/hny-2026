@@ -141,7 +141,7 @@ class HNY2026(cfg: HnyConfig, str: String) extends Module {
   })
 
   val sender = Module(new CharSender(cfg))
-  val chars = VecInit(str.map(c => c.toByte.U(cfg.dataWidth.W)))
+  val chars = VecInit(str.map(_.toByte.U(cfg.dataWidth.W)))
   val charCnt = RegInit(UInt(log2Up(str.length()).W), 0.U)
 
   sender.io.data.valid := true.B
@@ -174,13 +174,12 @@ class HNY2026(cfg: HnyConfig, str: String) extends Module {
  * </ul>
  */
 object HNY2026 extends App {
-  val argsMap = args.map { s =>
-    val ss = s.split("=")
-    if (ss.length == 1)
-      (ss(0), "")
-    else
-      (ss(0), ss(1))
-  }.toMap
+  val argsMap = args.map(
+    _.split("=") match {
+      case Array(name, value) => (name, value)
+      case Array(name) => (name, "")
+      case _ => ("", "")
+    }).toMap
 
   val clockFreq = argsMap.getOrElse("clockFreq", "27000000").toInt
   println(s"Clock frequency = $clockFreq Hz")
