@@ -143,13 +143,18 @@ class HNY2026(cfg: HnyConfig, str: String) extends Module {
   val sender = Module(new CharSender(cfg))
   val chars = VecInit(str.map(_.toByte.U(cfg.dataWidth.W)))
   val charCnt = RegInit(UInt(log2Up(str.length()).W), 0.U)
+  val sent = RegInit(false.B)
 
-  sender.io.data.valid := true.B
+  sender.io.data.valid := !sent
   sender.io.data.bits := chars(charCnt)
 
   when(sender.io.data.ready) {
     when(charCnt === (chars.length - 1).U) {
       charCnt := 0.U
+
+      if(!cfg.continuous) {
+        sent := true.B
+      }
     } otherwise {
       charCnt := charCnt + 1.U
     }
@@ -188,7 +193,8 @@ object HNY2026 extends App {
     clockFreq = clockFreq,
     frameRate = 30,
     frameRateAccuracy = 0.0001,
-    dataWidth = 8
+    dataWidth = 8,
+    continuous = true
   )
 
   ChiselStage.emitSystemVerilogFile(

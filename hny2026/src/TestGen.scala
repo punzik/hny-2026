@@ -35,7 +35,20 @@ object TestGen_CharSender extends App {
  */
 object TestGen_HNY2026 extends App {
   println(ChiselStage.emitSystemVerilog(
-    new HNY2026(HnyConfig(27000000, 30.3), "Hello!"),
+    new HNY2026(HnyConfig(27000000, 30.3, continuous = false), "Hello!"),
+    firtoolOpts = Array(
+      "--disable-all-randomization",
+      "--strip-debug-info"
+    )
+  ))
+}
+
+/**
+ * Run: mill hny2026.runMain hny2026.TestGen_HNY2026_Continuous
+ */
+object TestGen_HNY2026_Continuous extends App {
+  println(ChiselStage.emitSystemVerilog(
+    new HNY2026(HnyConfig(27000000, 30.3, continuous = true), "Hello!"),
     firtoolOpts = Array(
       "--disable-all-randomization",
       "--strip-debug-info"

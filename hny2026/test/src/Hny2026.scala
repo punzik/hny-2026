@@ -175,8 +175,16 @@ class HNY2026Test extends AnyFlatSpec with ChiselSim {
 
   behavior of "HNY2026"
 
-  it should s"send string '$str'" in {
-    simulate(new HNY2026(cfg, str)) { dut =>
+  it should s"send string '$str' in non countinous mode" in {
+    simulate(new HNY2026(cfg.copy(continuous = false), str)) { dut =>
+      enableWaves()
+      dut.clock.step((cfg.clockFreq / cfg.frameRate * cfg.dataWidth * str.length() * 2).toInt)
+      println("See results in the wave diagram.")
+    }
+  }
+
+  it should s"send string '$str' in countinous mode" in {
+    simulate(new HNY2026(cfg.copy(continuous = true), str)) { dut =>
       enableWaves()
       dut.clock.step((cfg.clockFreq / cfg.frameRate * cfg.dataWidth * str.length() * 2).toInt)
       println("See results in the wave diagram.")

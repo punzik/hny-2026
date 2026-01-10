@@ -26,10 +26,13 @@ import chisel3.util._
  *                           stream is `dataWidth + 2` bits, the
  *                           additional bits being a parity bit and a
  *                           empty ending bit.
+ * @param continuous         If true, the display will cycle continuously.
+ *                           If false, the display will show the message once and stop.
  */
 case class HnyConfig(
   clockFreq: Int = 27000000,
   frameRate: Double = 30.0,
   frameRateAccuracy: Double = 0.0001,
-  dataWidth: Int = 8
+  dataWidth: Int = 8,
+  continuous: Boolean = true
 )
